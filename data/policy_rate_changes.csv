@@ -1,0 +1,27 @@
+date,instrument,change_bp,new_rate,note,source
+2017-01-24,1年期MLF,10,3.10,MLF 首次上调,https://www.business-standard.com/amp/article/reuters/china-s-central-bank-lifts-two-of-its-lending-rates-to-rein-in-debt-117012400973_1.html
+2017-02-03,7天逆回购,10,2.35,春节后首个交易日，14 天、28 天同步上调,https://stock.stockstar.com/SS2017020400000311.shtml
+2017-03-16,7天逆回购,10,2.45,美联储加息后数小时,https://en.people.cn/n3/2017/0316/c90000-9191282.html
+2017-03-16,1年期MLF,10,3.20,和逆回购同一天,https://en.people.cn/n3/2017/0316/c90000-9191282.html
+2017-12-14,7天逆回购,5,2.50,美联储加息后,https://investinglive.com/news/!/china-injects-funds-through-mlfs-raises-rr-rates-20171214/
+2017-12-14,1年期MLF,5,3.25,和逆回购同一天,https://investinglive.com/news/!/china-injects-funds-through-mlfs-raises-rr-rates-20171214/
+2018-03-22,7天逆回购,5,2.55,美联储加息后,https://www.nbd.com.cn/articles/2018-03-22/1201476.html
+2018-04-17,1年期MLF,5,3.30,同一天宣布降准，方向相反，剔除,https://www.forexlive.com/centralbank/!/pboc-offering-mlf-today-20180417/amp/
+2019-11-05,1年期MLF,-5,3.25,2016 年以来首次下调,https://www.caixinglobal.com/2019-11-05/china-makes-first-cut-in-key-lending-rate-since-2016-101479257.html
+2019-11-18,7天逆回购,-5,2.50,,https://news.cgtn.com/news/2019-11-19/PBOC-cuts-rate-on-reverse-repo-by-5-basis-points-to-facilitate-loans-LJRQzsMJd6/index.html
+2020-02-03,7天逆回购,-10,2.40,春节后首个交易日，投放 1.2 万亿,https://www.thepaper.cn/newsDetail_forward_5916698
+2020-02-17,1年期MLF,-10,3.15,,https://chinadailyhk.com/article/121336
+2020-03-30,7天逆回购,-20,2.20,,https://www.cs.com.cn/xwzx/hg/202003/t20200331_6040644.html
+2020-04-15,1年期MLF,-20,2.95,,https://www.nbd.com.cn/articles/2020-04-15/1425785.html
+2022-01-17,7天逆回购,-10,2.10,和 MLF 同一天,https://cs.com.cn/xwzx/hg/202201/t20220117_6236033.html
+2022-01-17,1年期MLF,-10,2.85,和逆回购同一天,https://cs.com.cn/xwzx/hg/202201/t20220117_6236033.html
+2022-08-15,7天逆回购,-10,2.00,和 MLF 同一天,https://www.chinanews.com/cj/2022/08-16/9828132.shtml
+2022-08-15,1年期MLF,-10,2.75,和逆回购同一天,https://www.chinanews.com/cj/2022/08-16/9828132.shtml
+2023-06-13,7天逆回购,-10,1.90,逆回购先动,https://chinadailyhk.com//article/335768
+2023-06-15,1年期MLF,-10,2.65,,https://cn.chinadaily.com.cn/a/202306/15/WS648a75eea310dbde06d23819.html
+2023-08-15,7天逆回购,-10,1.80,和 MLF 同一天,https://govt.chinadaily.com.cn/s/202308/15/WS64db278d498ea274927c8b59/china-cuts-interest-rates-of-mlf-reverse-repos.html
+2023-08-15,1年期MLF,-15,2.50,和逆回购同一天,https://govt.chinadaily.com.cn/s/202308/15/WS64db278d498ea274927c8b59/china-cuts-interest-rates-of-mlf-reverse-repos.html
+2024-07-22,7天逆回购,-10,1.70,和 LPR 同一天,https://think.ing.com/snaps/chinas-7-day-reverse-repo-rate-and-lpr-cut-to-support-growth/
+2024-07-25,1年期MLF,-20,2.30,临时加开,https://think.ing.com/snaps/pboc-surprised-markets-with-an-off-schedule-20bp-cut-to-the-mlf
+2024-09-24,发布会,-20,1.50,宣布 7 天逆回购降 20bp（09-27 执行）、MLF 约降 30bp、降准 0.5 个百分点,https://english.www.gov.cn/news/202409/24/content_WS66f22dd8c6d0868f4e8eb325.html
+2025-05-07,发布会,-10,1.40,宣布 7 天逆回购降 10bp（05-08 执行）、降准 0.5 个百分点,https://english.www.gov.cn/news/202505/07/content_WS681af03ec6d0868f4e8f250c.html

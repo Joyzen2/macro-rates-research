@@ -1,0 +1,9 @@
+__pycache__/
+*.py[oc]
+.venv
+.pytest_cache/
+
+# 数据不放进仓库：data/raw/ 是公开接口的缓存，data/manual/ 是学校 CSMAR 的授权数据，data/external/ 是其他外部数据。
+# 例外：调息记录是按央行公告整理的，附了来源链接。
+data/*
+!data/policy_rate_changes.csv
