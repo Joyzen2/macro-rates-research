@@ -10,9 +10,10 @@ import html
 import math
 
 W = 460
-INK, INK2, MUTED, GRID, BASE, SURFACE = "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3c2b7", "#fcfcfb"
-S = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"]
-NEG, DIM = "#e34948", "#c3c2b7"
+INK, INK2, MUTED, GRID, BASE, SURFACE = "#0F2340", "#3D5371", "#55697F", "#DDE3EA", "#A7B4C2", "#F4F6F8"
+STEEL, NEG, DIM = "#5E7896", "#8FA6BF", "#C5D0DB"
+SURPRISE, SURPRISE_TEXT = "#D2462E", "#B5361F"        # 印泥红：全站只代表「意外」
+S = ["#C08A1E", "#2F6DB5", "#2A9D8F", "#7A6BB8"]       # 堆叠类别：已用 dataviz 校验器验过
 FONT = '-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif'
 STYLE = (f"<style>.vz text{{font-family:{FONT};fill:{INK};}}.vz .t2{{fill:{INK2};}}.vz .t3{{fill:{MUTED};}}"
          f".vz .grid{{stroke:{GRID};stroke-width:1;}}.vz .base{{stroke:{BASE};stroke-width:1;}}</style>")
@@ -51,8 +52,8 @@ def tick_label(t: float) -> str:
 
 
 class Svg:
-    def __init__(self, height: float, title: str, desc: str = ""):
-        self.h, self.title, self.desc, self.parts = height, title, desc, []
+    def __init__(self, height: float, title: str, desc: str = "", width: float = W):
+        self.h, self.w, self.title, self.desc, self.parts = height, width, title, desc, []
 
     def add(self, s: str) -> None:
         self.parts.append(s)
@@ -66,7 +67,7 @@ class Svg:
         self.add(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" class="{cls}"{extra}/>')
 
     def render(self) -> str:
-        return (f'<svg class="vz" viewBox="0 0 {W} {self.h:.0f}" role="img" xmlns="http://www.w3.org/2000/svg">'
+        return (f'<svg class="vz" viewBox="0 0 {self.w:.0f} {self.h:.0f}" role="img" xmlns="http://www.w3.org/2000/svg">'
                 f"<title>{esc(self.title)}</title><desc>{esc(self.desc)}</desc>{STYLE}{''.join(self.parts)}</svg>")
 
 
@@ -122,11 +123,11 @@ def hbar(rows: list[dict], *, title: str, unit: str = "", nd: int = 1, signed: b
         if r.get("color"):
             color = r["color"]
         elif highlight is not None:
-            color = S[0] if r["label"] in highlight else DIM
+            color = INK if r["label"] in highlight else DIM
         elif diverging:
-            color = S[0] if v >= 0 else NEG
+            color = INK if v >= 0 else NEG
         else:
-            color = S[0]
+            color = INK
         if r.get("sub"):
             svg.text(label_w - 12, yc - 6, r["label"], anchor="end")
             svg.text(label_w - 12, yc + 8, r["sub"], size=TICK, cls="t3", anchor="end")
@@ -214,10 +215,10 @@ def scatter_fit(points: list[tuple[float, float, str]], *, slope: float, interce
     svg.text(right, bottom + 28, xlabel, size=TICK, cls="t3", anchor="end")
     svg.text(left, top - 4, ylabel, size=TICK, cls="t3", baseline="auto")
     xa, xb = min(xs), max(xs)
-    svg.add(f'<line x1="{X(xa):.1f}" y1="{Y(intercept + slope * xa):.1f}" x2="{X(xb):.1f}" y2="{Y(intercept + slope * xb):.1f}" stroke="{S[0]}" stroke-width="2" stroke-linecap="round"/>')
+    svg.add(f'<line x1="{X(xa):.1f}" y1="{Y(intercept + slope * xa):.1f}" x2="{X(xb):.1f}" y2="{Y(intercept + slope * xb):.1f}" stroke="{SURPRISE}" stroke-width="2" stroke-linecap="round"/>')
     for x_, y_, tip in points:
-        svg.add(f'<circle cx="{X(x_):.1f}" cy="{Y(y_):.1f}" r="4" fill="{S[0]}" fill-opacity="0.85" stroke="{SURFACE}" stroke-width="2"><title>{esc(tip)}</title></circle>')
-    svg.add(f'<line x1="{left + 8:.1f}" y1="{top + 12:.1f}" x2="{left + 24:.1f}" y2="{top + 12:.1f}" stroke="{S[0]}" stroke-width="2" stroke-linecap="round"/>')
+        svg.add(f'<circle cx="{X(x_):.1f}" cy="{Y(y_):.1f}" r="4" fill="{INK}" fill-opacity="0.85" stroke="{SURFACE}" stroke-width="2"><title>{esc(tip)}</title></circle>')
+    svg.add(f'<line x1="{left + 8:.1f}" y1="{top + 12:.1f}" x2="{left + 24:.1f}" y2="{top + 12:.1f}" stroke="{SURPRISE}" stroke-width="2" stroke-linecap="round"/>')
     svg.text(left + 30, top + 12, fit_label, size=VALUE, cls="t2")
     return svg.render()
 
@@ -247,7 +248,7 @@ def strip_plot(rows: list[dict], *, title: str, unit: str = "", nd: int = 1, des
         for d in r["dots"]:
             svg.add(f'<circle cx="{x(d):.1f}" cy="{yc:.1f}" r="4" fill="{MUTED}" stroke="{SURFACE}" stroke-width="2"><title>{esc(num(d, nd, True, unit))}</title></circle>')
         m = r["mean"]
-        color = S[0] if m >= 0 else NEG
+        color = INK
         svg.add(f'<rect x="{x(m) - 1.5:.1f}" y="{yc - 11:.1f}" width="3" height="22" rx="1.5" fill="{color}"><title>均值 {esc(num(m, nd, True, unit))}</title></rect>')
         svg.text(x(m), yc - 18, "均值 " + num(m, nd, True, unit), size=TICK, cls="t2", anchor="middle")
     return svg.render()
@@ -305,7 +306,7 @@ def dot_plot(rows: list[tuple[str, float, bool]], *, title: str, ref: tuple[floa
         yc = top + row_h * i + row_h / 2
         svg.text(label_w - 12, yc, label, anchor="end")
         svg.line(label_w, yc, W - 30, yc, "grid")
-        color = S[0] if strong else INK2
+        color = INK if strong else STEEL
         svg.add(f'<circle cx="{x(v):.1f}" cy="{yc:.1f}" r="5" fill="{color}" stroke="{SURFACE}" stroke-width="2"><title>{esc(label)}：{num(v, nd, False, unit)}</title></circle>')
         svg.text(x(v) + (10 if v >= ref[0] else -10), yc, num(v, nd, False, unit), size=VALUE, cls="t2", anchor="start" if v >= ref[0] else "end")
     return svg.render()
@@ -338,11 +339,78 @@ def hbar_panels(labels: list[str], panels: list[tuple[str, list[float], list[str
                 svg.text(x(t), bottom + 12, tick_label(t), size=TICK, cls="t3", anchor="middle")
         for i, (v, m) in enumerate(zip(vals, marks)):
             yc = top + row_h * i + row_h / 2
-            color = S[0] if (highlight_rows is None or i in highlight_rows) else DIM
+            color = INK if (highlight_rows is None or i in highlight_rows) else DIM
             svg.add(f'<path d="{hbar_path(x(0), x(v), yc - 7, 14)}" fill="{color}"><title>{esc(labels[i])} · {esc(ptitle)}：{num(v, nd, True, unit)}</title></path>')
             lab = num(v, nd, True, "") + m
             if v >= 0:
                 svg.text(x(v) + 4, yc, lab, size=TICK, cls="t2")
             else:
                 svg.text(x(v) - 4, yc, lab, size=TICK, cls="t2", anchor="end")
+    return svg.render()
+
+
+def mini_hbar(rows: list[dict], *, title: str, unit: str = "", nd: int = 1, signed: bool = True, ref: tuple[float, str] | None = None,
+              desc: str = "", width: float = 320) -> str:
+    """首页用的小图：两三根横条，字号按小尺寸放大；rows：label、value、color；ref：（数值，说明），画一条竖的参考线。"""
+    label_w = max(text_width(r["label"], 14) for r in rows) + 12
+    vals = [r["value"] for r in rows] + ([ref[0]] if ref else [])
+    vmin, vmax = min(0.0, *vals), max(0.0, *vals)
+    lab = lambda r: num(r["value"], nd, signed, unit)
+    left_m = max([text_width(lab(r), 14) + 8 for r in rows if r["value"] < 0] or [0])
+    right_m = max([text_width(lab(r), 14) + 8 for r in rows if r["value"] >= 0] or [0])
+    top, row_h = 26 if ref else 6, 36
+    k = (width - 4 - label_w - left_m - right_m) / ((vmax - vmin) or 1.0)
+    lo, hi = vmin - left_m / k, vmax + right_m / k
+    x = _scale(lo, hi, label_w, width - 4)
+    bottom = top + row_h * len(rows)
+    svg = Svg(bottom + 8, title, desc, width=width)
+    svg.line(x(0), top - 4, x(0), bottom, "base")
+    if ref:
+        svg.add(f'<line x1="{x(ref[0]):.1f}" y1="{top - 8:.1f}" x2="{x(ref[0]):.1f}" y2="{bottom:.1f}" stroke="{INK2}" stroke-width="1.2" stroke-dasharray="0"/>')
+        svg.text(x(ref[0]), top - 14, ref[1], size=12, cls="t2", anchor="middle")
+    for i, r in enumerate(rows):
+        yc = top + row_h * i + row_h / 2
+        v, color = r["value"], r.get("color", INK)
+        svg.text(label_w - 10, yc, r["label"], size=14, anchor="end")
+        svg.add(f'<path d="{hbar_path(x(0), x(v), yc - 8, 16)}" fill="{color}"><title>{esc(r["label"])}：{esc(lab(r))}</title></path>')
+        if v >= 0:
+            svg.text(x(v) + 7, yc, lab(r), size=14, cls="t2", weight="600")
+        else:
+            svg.text(x(v) - 7, yc, lab(r), size=14, cls="t2", anchor="end", weight="600")
+    return svg.render()
+
+
+def tenor_lines(tenors: list[float], series: list[tuple[str, list[float], str, float]], *, title: str, unit: str = "bp", desc: str = "",
+                height: float = 250, ylabel: str = "", zero_label: str = "") -> str:
+    """横轴是期限（按平方根排布），每条线是各期限的变化；series：（名字，数值，颜色，线宽）。零线就是「没有变化」。"""
+    left, right, top, bottom = 40, W - 64, 48, height - 30
+    X = lambda t: left + (math.sqrt(t) - math.sqrt(tenors[0])) / (math.sqrt(tenors[-1]) - math.sqrt(tenors[0])) * (right - left)
+    allv = [v for _, vals, _, _ in series for v in vals] + [0.0]
+    lo, hi = min(allv), max(allv)
+    pad = (hi - lo) * 0.12
+    lo, hi = lo - pad, hi + pad
+    Y = _scale(lo, hi, bottom, top)
+    svg = Svg(height, title, desc)
+    legend(svg, [(n, c, "line") for n, _, c, _ in series], y=10)
+    for t in nice_ticks(lo, hi, 5):
+        if lo <= t <= hi:
+            svg.line(left, Y(t), right, Y(t), "base" if abs(t) < 1e-12 else "grid")
+            svg.text(left - 6, Y(t), tick_label(t), size=TICK, cls="t3", anchor="end")
+    if zero_label:
+        svg.text(right + 4, Y(0), zero_label, size=TICK, cls="t3")
+    names = {0.25: "3M", 0.5: "6M", 1: "1Y", 2: "2Y", 3: "3Y", 5: "5Y", 7: "7Y", 10: "10Y", 30: "30Y"}
+    for t in tenors:
+        if t == 0.5 and 0.25 in tenors:
+            continue
+        svg.text(X(t), bottom + 14, names.get(t, f"{t:g}Y"), size=TICK, cls="t3", anchor="middle")
+    for name, vals, color, width_ in series:
+        path = "M" + "L".join(f"{X(t):.1f},{Y(v):.1f}" for t, v in zip(tenors, vals))
+        svg.add(f'<path d="{path}" fill="none" stroke="{color}" stroke-width="{width_}" stroke-linejoin="round" stroke-linecap="round"/>')
+        for t, v in zip(tenors, vals):
+            svg.add(f'<circle cx="{X(t):.1f}" cy="{Y(v):.1f}" r="3.5" fill="{color}" stroke="{SURFACE}" stroke-width="1.5"><title>{esc(name)} {names.get(t, t)}：{num(v, 1, True, unit)}</title></circle>')
+        t_end, v_end = tenors[-1], vals[-1]
+        if not (zero_label and abs(Y(v_end) - Y(0)) < 14):
+            svg.text(X(t_end) + 8, Y(v_end), num(v_end, 1, True, ""), size=TICK, cls="t2")
+    if ylabel:
+        svg.text(left - 6, top - 10, ylabel, size=TICK, cls="t3", anchor="end", baseline="auto")
     return svg.render()

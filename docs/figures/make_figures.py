@@ -38,7 +38,7 @@ def fig_chain() -> str:
     gap, w, h, y = 12, (C.W - 3 * 12) / 4, 58, 8
     for i, (head, sub, strong) in enumerate(boxes):
         x = i * (w + gap)
-        fill, stroke = ("#e8f1fc", C.S[0]) if strong else (C.SURFACE, C.BASE)
+        fill, stroke = ("#E3EAF2", C.INK) if strong else (C.SURFACE, C.BASE)
         svg.add(f'<rect x="{x:.1f}" y="{y}" width="{w:.1f}" height="{h}" rx="6" fill="{fill}" stroke="{stroke}" stroke-width="{1.5 if strong else 1}"/>')
         svg.text(x + w / 2, y + 22, head, size=C.LABEL, anchor="middle", weight="600")
         svg.text(x + w / 2, y + 41, sub, size=10, cls="t2", anchor="middle")
@@ -64,8 +64,8 @@ def fig_identify() -> str:
     q = q.loc[:"2026-09-30"]
     post = post.reindex(q.index)
     dates = list(q.index)
-    return C.line_chart(dates, [("实时概率（每月只用当时的数据）", list(q["增长加速"]), C.S[0]),
-                                ("事后概率（全样本平滑）", list(post), C.MUTED)],
+    return C.line_chart(dates, [("实时概率（每月只用当时的数据）", list(q["增长加速"]), C.INK),
+                                ("事后概率（全样本平滑）", list(post), C.NEG)],
                         title="增长「加速」的实时概率和事后概率，2017-01 至 2026-09", ylo=0, yhi=1, yticks=[0, 0.5, 1], ref=0.5,
                         desc="实时概率频繁在 0 和 1 之间跳动；事后概率十年里只切换两次。", height=230)
 
@@ -152,8 +152,9 @@ def fig_lpr() -> str:
     for lab, key in order:
         r = g.loc[key]
         t = "" if pd.isna(r["1Y t"]) else f"，t {r['1Y t']:.1f}"
-        rows.append({"label": lab, "value": float(r["1Y 宽松方向平均(bp)"]), "sub": f"{int(r['1Y 次数'])} 次{t}"})
-    return C.hbar(rows, title="不同政策公告前后，1 年期利率互换的平均变化", unit="bp", highlight={"首发降息", "LPR 跟随下调"},
+        color = {"首发降息": C.SURPRISE, "LPR 跟随下调": C.INK}.get(lab, C.DIM)
+        rows.append({"label": lab, "value": float(r["1Y 宽松方向平均(bp)"]), "sub": f"{int(r['1Y 次数'])} 次{t}", "color": color})
+    return C.hbar(rows, title="不同政策公告前后，1 年期利率互换的平均变化", unit="bp",
                   axis_note="bp，公告前最后一个交易日到公告后第一个交易日", desc="首发降息平均 −7.5bp，跟在 MLF 后面的 LPR 下调平均 −0.3bp，不显著。")
 
 
@@ -177,8 +178,8 @@ def fig_cgb_curve() -> str:
     cols = ["3月", "6月", "1年", "3年", "5年", "7年", "10年", "30年"]
     tenor = [0.25, 0.5, 1, 3, 5, 7, 10, 30]
     pick = lambda d: cur.loc[cur.index[cur.index <= d].max(), cols].astype(float).tolist()
-    series = [("2026-10-22", [latest[c] for c in cols], C.S[0]), ("一个月前（" + cur.index[cur.index <= "2026-09-22"].max() + "）", pick("2026-09-22"), C.S[1]),
-              ("一年前（" + cur.index[cur.index <= "2025-10-22"].max() + "）", pick("2025-10-22"), C.MUTED)]
+    series = [("2026-10-22", [latest[c] for c in cols], C.INK), ("一个月前（" + cur.index[cur.index <= "2026-09-22"].max() + "）", pick("2026-09-22"), C.STEEL),
+              ("一年前（" + cur.index[cur.index <= "2025-10-22"].max() + "）", pick("2025-10-22"), "#A9BBCD")]
     left, right, top, bottom = 34, C.W - 14, 44, 206
     X = lambda t: left + (np.sqrt(t) - np.sqrt(0.25)) / (np.sqrt(30) - np.sqrt(0.25)) * (right - left)
     allv = [v for _, vals, _ in series for v in vals]
@@ -202,8 +203,136 @@ def fig_cgb_curve() -> str:
     return svg.render()
 
 
+
+
+def _events_by_tenor():
+    """降息、降准公告前后，国债曲线每个期限的平均变化（宽松方向，bp），窗口和第 11 步一样。"""
+    sys.path.insert(0, str(PROJECT / "src"))
+    from macrob import curve, policy, policy_rates
+    c = curve.curve_daily()
+    days = c.index
+    old, rates = policy.events(), policy_rates.rate_events()
+    groups = {"降息": pd.concat([old[old["type"] == "降息（基准）"][["date", "direction"]],
+                               rates[(rates["分组"] == "首发") & (rates["direction"] < 0)][["date", "direction"]]]),
+              "降准": old[old["type"] == "降准"][["date", "direction"]]}
+    out = {}
+    for name, e in groups.items():
+        rows = []
+        for d in e["date"]:
+            a = days.searchsorted(d, side="left") - 1
+            b = days.searchsorted(d, side="right")
+            if a >= 0 and b < len(days):
+                rows.append((c.iloc[b] - c.iloc[a]).to_numpy() * 100)
+        out[name] = (np.mean(rows, axis=0), len(rows))
+    return list(c.columns), out
+
+
+def fig_cut_vs_rrr() -> str:
+    cols, out = _events_by_tenor()
+    tenors = [0.25, 0.5, 1, 3, 5, 7, 10, 30]
+    (cut, n1), (rrr, n2) = out["降息"], out["降准"]
+    return C.tenor_lines(tenors, [(f"降息（{n1} 次）", list(cut), C.INK, 2.4), (f"降准（{n2} 次）", list(rrr), C.S[0], 2.4)],
+                         title="降息和降准公告前后，国债曲线各期限的平均变化", ylabel="bp", zero_label="不变",
+                         desc="降息时各期限一起下行；降准时短端下行更多、长端几乎不动，曲线变陡。")
+
+
+def fig_curve_pair() -> str:
+    from hero import STATES, TENORS, NAMES
+    W2, panel, gap, top, bottom = C.W, (C.W - 20) / 2, 20, 30, 196
+    lo, hi = 1.35, 3.30
+    svg = C.Svg(232, "同样是降息：首发那天和跟随那天的国债曲线", "左边首发降息，两条线之间是意外带来的下移；右边跟随的 LPR 下调，两条线几乎重合。")
+    for p, (key, title) in enumerate((("first", "首发 2022-08-15"), ("follow", "跟随 LPR 2022-08-22"))):
+        st = STATES[key]
+        x0 = p * (panel + gap) + 30
+        x1 = x0 + panel - 46
+        X = lambda t: x0 + (np.sqrt(t) - np.sqrt(0.25)) / (np.sqrt(30) - np.sqrt(0.25)) * (x1 - x0)
+        Y = lambda v: bottom - (v - lo) / (hi - lo) * (bottom - top)
+        svg.text(x0, 12, title, size=C.LABEL, weight="600")
+        for v in (1.5, 2.0, 2.5, 3.0):
+            svg.line(x0, Y(v), x1, Y(v), "grid")
+            if p == 0:
+                svg.text(x0 - 6, Y(v), f"{v:.1f}", size=C.TICK, cls="t3", anchor="end")
+        for t, n in zip(TENORS, NAMES):
+            if n in ("3M", "1Y", "5Y", "10Y", "30Y"):
+                svg.text(X(t), bottom + 14, n, size=C.TICK, cls="t3", anchor="middle")
+        pre = "L".join(f"{X(t):.1f},{Y(v):.1f}" for t, v in zip(TENORS, st["pre"]))
+        post = "L".join(f"{X(t):.1f},{Y(v):.1f}" for t, v in zip(TENORS, st["post"]))
+        back = "L".join(f"{X(t):.1f},{Y(v):.1f}" for t, v in reversed(list(zip(TENORS, st["post"]))))
+        svg.add(f'<path d="M{pre}L{back}Z" fill="{C.SURPRISE if st["surprise"] else "#AFC0D2"}" fill-opacity="0.9"/>')
+        svg.add(f'<path d="M{pre}" fill="none" stroke="{C.STEEL}" stroke-width="1.6"/><path d="M{post}" fill="none" stroke="{C.INK}" stroke-width="2.4"/>')
+        d10 = (st["post"][6] - st["pre"][6]) * 100
+        color = C.SURPRISE_TEXT if st["surprise"] else C.MUTED
+        y_band = Y(min(st["pre"][6], st["post"][6])) + 3
+        svg.add(f'<line x1="{X(10):.1f}" y1="{y_band:.1f}" x2="{X(10):.1f}" y2="{Y(1.95):.1f}" stroke="{color}" stroke-width="1"/>')
+        svg.add(f'<text x="{X(10):.1f}" y="{Y(1.95) + 14:.1f}" font-size="{C.VALUE}" font-weight="700" fill="{color}" text-anchor="middle">'
+                f'{"意外" if st["surprise"] else "预期之内"} {C.num(d10, 0, True, "bp")}</text>')
+    svg.text(30, 224, "细线：公告前收盘　粗线：公告后收盘", size=C.TICK, cls="t3")
+    return svg.render()
+
+
+def fig_gdp_curve() -> str:
+    tenors = [0.25, 0.5, 1, 3, 5, 7, 10, 30]
+    before = [1.1568, 1.1587, 1.1703, 1.2729, 1.3815, 1.4700, 1.6480, 2.060]
+    after = [1.1750, 1.1752, 1.1813, 1.2674, 1.3770, 1.4673, 1.6497, 2.061]
+    chg = [(b - a) * 100 for a, b in zip(before, after)]
+    return C.tenor_lines(tenors, [("10-16 → 10-19 收盘", chg, C.INK, 2.4)], title="GDP 公布当天，国债曲线各期限的变化", ylabel="bp", zero_label="不变",
+                         height=220, desc="短端上行 1–2bp，中长端基本不动，都在平常一天的波动范围里。")
+
+
+def fig_carry() -> str:
+    c = pd.read_csv(pathlib.Path(__file__).parent / "data" / "carry_20261022.csv", encoding="utf-8-sig")
+    labels = [f"{int(t)} 年" for t in c["期限（年）"]]
+    return C.hbar_panels(labels, [("票息减资金成本", list(c["票息减资金成本（bp）"]), [""] * len(c)), ("骑乘", list(c["骑乘（bp）"]), [""] * len(c))],
+                         title="国债各期限持有 3 个月：票息减资金成本和骑乘（2026-10-22）", unit="bp",
+                         desc="1–3 年收益率低于资金成本，票息为负；7–10 年骑乘最厚。")
+
+
+def mini_lpr() -> str:
+    return C.mini_hbar([{"label": "首发降息", "value": -7.5, "color": C.SURPRISE}, {"label": "跟随的 LPR", "value": -0.3, "color": C.INK}],
+                       title="首发降息和跟随的 LPR 下调，1 年期利率互换的平均变化", unit="bp")
+
+
+def mini_brier() -> str:
+    return C.mini_hbar([{"label": "增长概率", "value": 0.39}, {"label": "通胀概率", "value": 0.32}], title="实时状态概率的 Brier 分数（越低越好）",
+                       nd=2, signed=False, ref=(0.25, "一直猜 50%"))
+
+
+def mini_vol() -> str:
+    return C.mini_hbar([{"label": "期权隐含波动", "value": 5.5, "color": C.INK}, {"label": "宏观变量", "value": -7.1, "color": C.DIM}],
+                       title="预测固收+ 组合下月波动：相对市场基准的样本外 R²", unit="%")
+
+
+def hero_fragment() -> str:
+    from hero import fragment
+    return fragment("me@example.com")
+
+
+def fig_chain_narrow() -> str:
+    """手机上用的竖排版本：四个方框从上到下，市场预期这一环强调。"""
+    boxes = [("宏观数据", "按首次公布日对齐", False), ("宏观状态", "增长、通胀的实时概率", False),
+             ("市场预期", "一致预期、利率互换、期权", True), ("资产配置", "风险预算、固收+", False)]
+    w, h, gap, x = 300, 56, 18, 10
+    svg = C.Svg(4 * h + 3 * gap + 40, "研究框架：宏观状态和资产配置之间，隔着市场预期这一环",
+                "四个方框从上到下：宏观数据、宏观状态、市场预期、资产配置。市场预期这一环被强调。", width=320)
+    for i, (head, sub, strong) in enumerate(boxes):
+        y = 6 + i * (h + gap)
+        fill, stroke = ("#E3EAF2", C.INK) if strong else (C.SURFACE, C.BASE)
+        svg.add(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="6" fill="{fill}" stroke="{stroke}" stroke-width="{1.5 if strong else 1}"/>')
+        svg.text(x + 18, y + h / 2, head, size=16, weight="600")
+        svg.text(x + w - 16, y + h / 2, sub, size=13, cls="t2", anchor="end")
+        if i < 3:
+            ay = y + h + 3
+            svg.add(f'<path d="M{x + 40},{ay}v{gap - 6}" stroke="{C.MUTED}" stroke-width="1.4"/><path d="M{x + 36.5},{ay + gap - 9}l3.5,4l3.5,-4" fill="none" stroke="{C.MUTED}" stroke-width="1.4"/>')
+    svg.text(160, 4 * h + 3 * gap + 28, "美林时钟从「宏观状态」直接跳到「资产配置」", size=12, cls="t3", anchor="middle")
+    return svg.render()
+
+
 if __name__ == "__main__":
-    for name, fn in [("chain", fig_chain), ("pricing", fig_pricing), ("mapping", fig_mapping), ("kuttner", fig_kuttner),
+    for name, fn in [("chain", fig_chain), ("chain-narrow", fig_chain_narrow), ("pricing", fig_pricing), ("mapping", fig_mapping), ("kuttner", fig_kuttner),
                      ("data-surprise", fig_data_surprise), ("vol", fig_vol), ("attribution", fig_attribution), ("gdp-2026q3", fig_gdp),
-                     ("lpr", fig_lpr), ("curve-events", fig_curve_events), ("cgb-curve", fig_cgb_curve), ("identify", fig_identify)]:
+                     ("lpr", fig_lpr), ("curve-events", fig_curve_events), ("cgb-curve", fig_cgb_curve), ("identify", fig_identify),
+                     ("cut-vs-rrr", fig_cut_vs_rrr), ("curve-pair", fig_curve_pair), ("gdp-curve", fig_gdp_curve), ("carry", fig_carry),
+                     ("mini-lpr", mini_lpr), ("mini-brier", mini_brier), ("mini-vol", mini_vol)]:
         save(name, fn())
+    (OUT / "hero.html").write_text(hero_fragment(), encoding="utf-8")
+    print("写了 hero")

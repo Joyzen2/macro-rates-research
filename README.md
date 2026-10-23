@@ -11,6 +11,30 @@
 - **风险**：预测固收+（债 80% + 股 20%）组合下个月的波动，期权隐含波动有增量（样本外 R² +5.5%，Clark-West t 2.1），宏观变量都没有。
 - **配置**：风险预算组合扣无风险夏普 1.0–1.1，远好于股债 60/40 的 0.29；但超额收益一半来自黄金、四成来自债券，不是来自宏观判断。
 
+![研究框架：宏观状态和资产配置之间，隔着市场预期这一环](docs/figures/png/chain.png)
+
+### 利率只为意外定价
+
+2022 年 8 月 15 日首发降息，整条国债曲线下移约 10bp；一周后跟随的 LPR 下调，曲线没有再往下走。把 40 次调息公告前后 1 年期利率互换的变化当作意外，意外每 1bp 带动 10 年国债 0.62bp。
+
+![同样是降息：首发那天和跟随那天的国债曲线](docs/figures/png/curve-pair.png)
+
+![调息公告：利率互换度量的意外和 10 年国债的反应](docs/figures/png/kuttner.png)
+
+### 宏观状态择时不灵
+
+实时概率在 0 和 1 之间频繁跳动，事后状态十年只切换两次；确认切换后 6 个月，股票按信号方向平均反向 5.5%。
+
+![增长「加速」的实时概率和事后概率](docs/figures/png/identify.png)
+
+### 有增量的是期权，不是宏观
+
+![预测固收+ 组合下月波动：相对市场基准的样本外 R²](docs/figures/png/vol.png)
+
+### 风险预算的收益从哪来
+
+![风险平价组合每年的超额收益从哪来](docs/figures/png/attribution.png)
+
 ## 代码结构
 
 | 模块 | 内容 |
@@ -50,7 +74,7 @@ uv run pytest -q
 - `allocation_summary*.csv`、`allocation_placebo*.csv`：配置回测和安慰剂
 - `nowcast_scores.csv`、`curve_q*.csv`、`credit_impulse_*.csv`、`taylor_rule.csv`：其余专题
 
-`docs/figures/` 是网站上的图和画图脚本。
+`docs/figures/` 是网站上的图（`svg/`、`png/`）和画图脚本。
 
 ## 数据（不在仓库里）
 
