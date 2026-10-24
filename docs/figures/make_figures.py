@@ -302,6 +302,49 @@ def mini_vol() -> str:
                        title="预测固收+ 组合下月波动：相对市场基准的样本外 R²", unit="%")
 
 
+LIQ_WEEK = (pd.Timestamp("2026-10-19"), pd.Timestamp("2026-10-23"))
+
+
+def _liq() -> tuple[pd.DataFrame, pd.DataFrame]:
+    d = pd.read_csv(R / "liquidity_daily.csv", parse_dates=["date"]).set_index("date")
+    omo = pd.read_csv(R / "liquidity_omo_daily.csv", parse_dates=["date"]).set_index("date")
+    return d, omo
+
+
+def fig_liq_rates() -> str:
+    d, _ = _liq()
+    x = d.loc["2026-07-23":LIQ_WEEK[1]].dropna(subset=["DR001"])
+    return C.daily_lines(list(x.index), [("DR001", x["DR001"].tolist(), C.INK, 2.2), ("DR007", x["DR007"].tolist(), C.S[1], 2.0)],
+                         title="近三个月的 DR001、DR007 和 7 天逆回购利率", ylo=1.20, yhi=1.52, yticks=[1.2, 1.3, 1.4, 1.5],
+                         unit="%", refs=((1.40, "7 天逆回购 1.40%"),), band=(*LIQ_WEEK, "本周"),
+                         desc="2026 年 7 月 23 日到 10 月 23 日每天的 DR001 和 DR007，以及 7 天逆回购利率 1.40%。"
+                              "两条线在月末和 9 月中旬税期冲到 1.40% 以上，10 月以来明显回落，本周 DR001 在 1.26%–1.27%。")
+
+
+def fig_liq_spread() -> str:
+    d, _ = _liq()
+    x = d.loc["2024-07-22":LIQ_WEEK[1]].dropna(subset=["DR001s"])
+    sp = (x["DR001s"] - x["rate7"]) * 100
+    ma = sp.rolling(20).mean()
+    lo, hi = np.floor(sp.min() / 10) * 10, np.ceil(sp.max() / 10) * 10
+    return C.daily_lines(list(x.index), [("每天", sp.tolist(), C.NEG, 1.0), ("20 日均值", ma.tolist(), C.INK, 2.2)],
+                         title="DR001 离 7 天逆回购利率有多远（基点）", ylo=lo, yhi=hi, yticks=C.nice_ticks(lo, hi, 5), unit="bp", nd=1,
+                         refs=((0.0, "7 天逆回购利率"),), month_step=6, height=260,
+                         vlines=((pd.Timestamp("2024-09-27"), "降到 1.50%"), (pd.Timestamp("2025-05-08"), "降到 1.40%"),
+                                 (pd.Timestamp("2026-06-29"), "开始做隔夜")),
+                         desc="2024 年 7 月 7 天逆回购利率成为主要政策利率以来，每天 DR001 减 7 天逆回购利率，以及 20 个交易日均值。"
+                              "2026 年 7 月 23 日以前用银银间回购定盘利率 FDR001 代替。")
+
+
+def fig_liq_omo() -> str:
+    _, omo = _liq()
+    w = omo.loc["2026-08-24":LIQ_WEEK[1], "net"].resample("W-FRI").sum()
+    rows = [{"label": f"{f - pd.Timedelta(days=4):%m-%d} 至 {f:%m-%d}", "value": float(v), **({"mark": "（本周）"} if f == LIQ_WEEK[1] else {})}
+            for f, v in w.items()]
+    return C.hbar(rows, title="近九周公开市场逆回购的净投放（亿元）", nd=0, signed=True, diverging=True, axis_note="亿元，只算逆回购",
+                  desc="每周 7 天、14 天、隔夜逆回购的操作量减到期量。不含 MLF 和买断式逆回购。")
+
+
 def hero_fragment() -> str:
     from hero import fragment
     return fragment("me@example.com")
@@ -332,7 +375,8 @@ if __name__ == "__main__":
                      ("data-surprise", fig_data_surprise), ("vol", fig_vol), ("attribution", fig_attribution), ("gdp-2026q3", fig_gdp),
                      ("lpr", fig_lpr), ("curve-events", fig_curve_events), ("cgb-curve", fig_cgb_curve), ("identify", fig_identify),
                      ("cut-vs-rrr", fig_cut_vs_rrr), ("curve-pair", fig_curve_pair), ("gdp-curve", fig_gdp_curve), ("carry", fig_carry),
-                     ("mini-lpr", mini_lpr), ("mini-brier", mini_brier), ("mini-vol", mini_vol)]:
+                     ("mini-lpr", mini_lpr), ("mini-brier", mini_brier), ("mini-vol", mini_vol),
+                     ("liq-rates", fig_liq_rates), ("liq-spread", fig_liq_spread), ("liq-omo", fig_liq_omo)]:
         save(name, fn())
     (OUT / "hero.html").write_text(hero_fragment(), encoding="utf-8")
     print("写了 hero")

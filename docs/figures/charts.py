@@ -414,3 +414,82 @@ def tenor_lines(tenors: list[float], series: list[tuple[str, list[float], str, f
     if ylabel:
         svg.text(left - 6, top - 10, ylabel, size=TICK, cls="t3", anchor="end", baseline="auto")
     return svg.render()
+
+
+def _month_axis(svg: Svg, X, d0, d1, bottom: float, step: int = 1) -> None:
+    """日度横轴：每月 1 日一个刻度；跨度超过一年的标「2025.07」，否则标「8月」。"""
+    import datetime as _dt
+    long = (d1 - d0).days > 400
+    y, m = (d0.year, d0.month + 1) if d0.month < 12 else (d0.year + 1, 1)
+    k = 0
+    while _dt.date(y, m, 1) <= d1.date():
+        if (m - 1) % step == 0:                              # 隔几个月标一次时对齐到季初（1、4、7、10 月）
+            xt = X(_dt.date(y, m, 1).toordinal())
+            svg.line(xt, bottom, xt, bottom + 4, "base")
+            svg.text(xt, bottom + 14, f"{y}.{m:02d}" if long else f"{m}月", size=TICK, cls="t3", anchor="middle")
+        k += 1
+        y, m = (y, m + 1) if m < 12 else (y + 1, 1)
+
+
+def _spread_labels(items: list[list], gap: float = 14.0) -> None:
+    """线尾标签按 y 排开，挨得太近就往下推；items：[y, 文字, 颜色]，原地改 y。"""
+    items.sort(key=lambda it: it[0])
+    for i in range(1, len(items)):
+        if items[i][0] - items[i - 1][0] < gap:
+            items[i][0] = items[i - 1][0] + gap
+
+
+def daily_lines(dates: list, series: list[tuple[str, list[float], str, float]], *, title: str, ylo: float, yhi: float,
+                yticks: list[float], unit: str = "", nd: int = 2, refs: tuple = (), vlines: tuple = (), band: tuple | None = None,
+                desc: str = "", height: float = 250, month_step: int = 1, ylabel: str = "", end_values: bool = True) -> str:
+    """日度折线：横轴按日期，每月一个刻度；series：（名字，数值，颜色，线宽）。线尾直接标名字（和最新值），不用图例。
+    refs：（数值，说明），比如政策利率，画成虚的细线、说明标在右边；vlines：（日期，说明），竖的参考线；
+    band：（起，止，说明），浅底色标出一段，比如本周。"""
+    tails = [f"{n} {num(v[-1], nd)}{unit}" if end_values else n for n, v, _, _ in series] + [lab for _, lab in refs]
+    left, top, bottom = 36, 22 if (vlines or band) else 10, height - 26
+    right = W - max(text_width(t, VALUE) for t in tails) - 26           # 右边留给线尾的色标和标签
+    t0, t1 = dates[0].toordinal(), dates[-1].toordinal()
+    X, Y = _scale(t0, t1, left, right), _scale(ylo, yhi, bottom, top)
+    svg = Svg(height, title, desc)
+    if band:
+        xa, xb = X(band[0].toordinal() - 0.5), min(X(band[1].toordinal() + 0.5), right)
+        svg.add(f'<rect x="{xa:.1f}" y="{top:.1f}" width="{xb - xa:.1f}" height="{bottom - top:.1f}" fill="#E8EDF2"/>')
+        svg.text((xa + xb) / 2, top - 8, band[2], size=TICK, cls="t2", anchor="middle")
+    for t in yticks:
+        svg.line(left, Y(t), right, Y(t), "base" if abs(t) < 1e-12 and ylo < 0 else "grid")
+        svg.text(left - 6, Y(t), tick_label(t), size=TICK, cls="t3", anchor="end")
+    for d, lab in vlines:
+        xv = X(d.toordinal())
+        svg.line(xv, top, xv, bottom, "base", ' stroke-dasharray="2 3"')
+        svg.text(xv + 3, top - 8, lab, size=TICK, cls="t3")
+    _month_axis(svg, X, dates[0], dates[-1], bottom, month_step)
+    svg.line(left, bottom, right, bottom, "base")
+    ends = []
+    for v, lab in refs:
+        svg.add(f'<line x1="{left:.1f}" y1="{Y(v):.1f}" x2="{right:.1f}" y2="{Y(v):.1f}" stroke="{MUTED}" stroke-width="1.2" stroke-dasharray="5 4"/>')
+        ends.append([Y(v), lab, None])
+    hover = len(dates) <= 130
+    for name, vals, color, width_ in series:
+        segs, cur = [], []
+        for d, v in zip(dates, vals):
+            if v == v:
+                cur.append(f"{X(d.toordinal()):.1f},{Y(v):.1f}")
+            elif cur:
+                segs.append(cur); cur = []
+        segs += [cur] if cur else []
+        path = "".join("M" + "L".join(s) for s in segs)
+        svg.add(f'<path d="{path}" fill="none" stroke="{color}" stroke-width="{width_}" stroke-linejoin="round" stroke-linecap="round"><title>{esc(name)}</title></path>')
+        if hover:
+            for d, v in zip(dates, vals):
+                if v == v:
+                    svg.add(f'<circle cx="{X(d.toordinal()):.1f}" cy="{Y(v):.1f}" r="3" fill="{color}" fill-opacity="0"><title>{esc(name)} {d:%m-%d}：{num(v, nd)}{esc(unit)}</title></circle>')
+        last = next(v for v in reversed(vals) if v == v)
+        ends.append([Y(last), f"{name} {num(last, nd)}{unit}" if end_values else name, color])
+    _spread_labels(ends)
+    for y_, lab, color in ends:                              # 色标用线的颜色，文字照旧用墨色
+        dash = ' stroke-dasharray="3 2"' if color is None else ""
+        svg.add(f'<line x1="{right + 6:.1f}" y1="{y_:.1f}" x2="{right + 16:.1f}" y2="{y_:.1f}" stroke="{color or MUTED}" stroke-width="2"{dash}/>')
+        svg.text(right + 20, y_, lab, size=VALUE, cls="t2" if color is None else "", weight=None if color is None else "600")
+    if ylabel:
+        svg.text(left - 6, top - 8, ylabel, size=TICK, cls="t3", anchor="end", baseline="auto")
+    return svg.render()
