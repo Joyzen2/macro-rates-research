@@ -31,6 +31,8 @@ FLASHES = RAW / "wscn_reverse_repo_flashes.jsonl"
 # 7 天逆回购利率，生效日（和 data/policy_rate_changes.csv 一致；两次发布会宣布的降息分别在 09-27、05-08 执行）
 RATE7 = [("2023-08-15", 1.80), ("2024-07-22", 1.70), ("2024-09-27", 1.50), ("2025-05-08", 1.40)]
 OVERNIGHT_START = pd.Timestamp("2026-06-29")
+# 2026-10-30 央行公告：11-02 起每个工作日做隔夜逆回购，固定利率，隔夜利率成为主要政策利率；7 天逆回购改为利率招标
+RATE_ON = [("2026-11-02", 1.25)]
 
 
 # ── 取数（每次增量更新，缓存在 data/raw/）──────────────────────────────
@@ -206,6 +208,10 @@ def parse_flash(text: str, day: pd.Timestamp | None = None) -> dict | None:
         m = re.search(r"(?:7|七)天期?逆回购操作[，,]?(?:操作)?利率(?:为)?(\d\.\d+)%", t)
         if m:
             out["rate7"] = float(m.group(1))
+    if "on" in out:
+        m = re.search(r"隔夜逆回购操作[，,]?(?:操作)?利率(?:为)?(\d\.\d+)%", t)
+        if m:
+            out["rate_on"] = float(m.group(1))
     due = re.findall(r"(?:今日|当日|另)(?:有)?((?:" + AMT_NC + r"(?:7天期|七天期|14天期|隔夜)?(?:逆回购)?[和、及]?)+)到期", t)
     if due:                                                # 一条里分开说 7 天和隔夜到期的，加起来
         out["maturity"] = sum(_amt(a, u) for g in due for a, u in re.findall(AMT, g))
@@ -260,7 +266,7 @@ def omo_daily(flashes: list[dict], calendar: pd.DatetimeIndex | None = None) -> 
         for k, v in p.items():
             r.setdefault(k, v)
     d = pd.DataFrame.from_dict(rows, orient="index").sort_index()
-    for k in ("d7", "d14", "on", "maturity", "day_net", "rate7", "week_net"):
+    for k in ("d7", "d14", "on", "maturity", "day_net", "rate7", "rate_on", "week_net"):
         if k not in d:
             d[k] = float("nan")
     d = d.rename(columns={"maturity": "maturity_reported"})
@@ -274,13 +280,19 @@ def omo_daily(flashes: list[dict], calendar: pd.DatetimeIndex | None = None) -> 
     d["net"] = d["ops"] - d["maturity"]
     d.index.name = "date"
     return d[["d7", "d14", "on", "ops", "maturity", "maturity_src", "maturity_reported", "maturity_model", "day_net", "net",
-              "rate7", "week_net", "flashes"]]
+              "rate7", "rate_on", "week_net", "flashes"]]
 
 
 # ── 资金价格 ─────────────────────────────────────────────────────────
 
 def rate7_on(dates: pd.DatetimeIndex) -> pd.Series:
     steps = pd.Series([r for _, r in RATE7], index=pd.to_datetime([d for d, _ in RATE7]))
+    return steps.reindex(steps.index.union(dates)).ffill().reindex(dates)
+
+
+def rate_on_on(dates: pd.DatetimeIndex) -> pd.Series:
+    """隔夜政策利率；11-02 之前是空的（6-29 起的隔夜逆回购利率没有公布）。"""
+    steps = pd.Series([r for _, r in RATE_ON], index=pd.to_datetime([d for d, _ in RATE_ON]))
     return steps.reindex(steps.index.union(dates)).ffill().reindex(dates)
 
 
@@ -291,6 +303,7 @@ def daily_table(dr: pd.DataFrame, fx: pd.DataFrame, shibor: pd.DataFrame, gc: pd
     d["DR001s"] = d["DR001"].fillna(d["FDR001"])           # 拼接：有 DR 用 DR，之前用定盘的 FDR
     d["DR007s"] = d["DR007"].fillna(d["FDR007"])
     d["rate7"] = rate7_on(d.index)
+    d["rate_on"] = rate_on_on(d.index)
     d.index.name = "date"
     return d
 
@@ -311,6 +324,7 @@ def week_summary(d: pd.DataFrame, omo: pd.DataFrame, friday: pd.Timestamp) -> di
                 "last": round(wk[col].iloc[-1], 4), "vs_rate7_bp": bp((wk[col] - wk["rate7"]).mean()),
                 "pct250": round(percentile(d[col], wk[col].mean(), friday), 1)}
     s["rate7"] = float(wk["rate7"].iloc[-1])
+    s["DR001_vs_rate_on_bp"] = bp((wk["DR001s"] - wk["rate_on"]).mean())
     s["FR001_DR001_bp"] = bp((wk["FR001"] - wk["DR001s"]).mean())
     s["GC001_DR001_bp"] = bp((wk["GC001"] - wk["DR001s"]).mean())
     s["SHIBOR_3M"] = {"last": float(wk["SHIBOR_3M"].iloc[-1]), "chg_bp": bp(wk["SHIBOR_3M"].iloc[-1] - prev["SHIBOR_3M"].iloc[-1])}

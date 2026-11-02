@@ -303,6 +303,7 @@ def mini_vol() -> str:
 
 
 LIQ_WEEK = (pd.Timestamp("2026-10-19"), pd.Timestamp("2026-10-23"))
+LIQ_WEEK2 = (pd.Timestamp("2026-10-26"), pd.Timestamp("2026-10-30"))
 
 
 def _liq() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -311,12 +312,13 @@ def _liq() -> tuple[pd.DataFrame, pd.DataFrame]:
     return d, omo
 
 
-def fig_liq_rates() -> str:
+def fig_liq_rates(week=LIQ_WEEK, refs=((1.40, "7 天逆回购 1.40%"),), label="本周") -> str:
     d, _ = _liq()
-    x = d.loc["2026-07-23":LIQ_WEEK[1]].dropna(subset=["DR001"])
+    x = d.loc["2026-07-23":week[1]].dropna(subset=["DR001"])
     return C.daily_lines(list(x.index), [("DR001", x["DR001"].tolist(), C.INK, 2.2), ("DR007", x["DR007"].tolist(), C.S[1], 2.0)],
-                         title="近三个月的 DR001、DR007 和 7 天逆回购利率", ylo=1.20, yhi=1.52, yticks=[1.2, 1.3, 1.4, 1.5],
-                         unit="%", refs=((1.40, "7 天逆回购 1.40%"),), band=(*LIQ_WEEK, "本周"),
+                         title="近三个月的 DR001、DR007 和政策利率" if len(refs) > 1 else "近三个月的 DR001、DR007 和 7 天逆回购利率",
+                         ylo=1.20, yhi=1.52, yticks=[1.2, 1.3, 1.4, 1.5],
+                         unit="%", refs=refs, band=(*week, label),
                          desc="2026 年 7 月 23 日到 10 月 23 日每天的 DR001 和 DR007，以及 7 天逆回购利率 1.40%。"
                               "两条线在月末和 9 月中旬税期冲到 1.40% 以上，10 月以来明显回落，本周 DR001 在 1.26%–1.27%。")
 
@@ -336,13 +338,48 @@ def fig_liq_spread() -> str:
                               "2026 年 7 月 23 日以前用银银间回购定盘利率 FDR001 代替。")
 
 
-def fig_liq_omo() -> str:
+def fig_liq_omo(week=LIQ_WEEK, start="2026-08-24", label="（本周）") -> str:
     _, omo = _liq()
-    w = omo.loc["2026-08-24":LIQ_WEEK[1], "net"].resample("W-FRI").sum()
-    rows = [{"label": f"{f - pd.Timedelta(days=4):%m-%d} 至 {f:%m-%d}", "value": float(v), **({"mark": "（本周）"} if f == LIQ_WEEK[1] else {})}
+    w = omo.loc[start:week[1], "net"].resample("W-FRI").sum()
+    rows = [{"label": f"{f - pd.Timedelta(days=4):%m-%d} 至 {f:%m-%d}", "value": float(v), **({"mark": label} if f == week[1] else {})}
             for f, v in w.items()]
-    return C.hbar(rows, title="近九周公开市场逆回购的净投放（亿元）", nd=0, signed=True, diverging=True, axis_note="亿元，只算逆回购",
+    return C.hbar(rows, title=f"近{ {9: '九', 10: '十'}.get(len(rows), len(rows)) }周公开市场逆回购的净投放（亿元）", nd=0, signed=True, diverging=True, axis_note="亿元，只算逆回购",
                   desc="每周 7 天、14 天、隔夜逆回购的操作量减到期量。不含 MLF 和买断式逆回购。")
+
+
+def fig_liq_anchor(end=pd.Timestamp("2026-10-30")) -> str:
+    """换锚：DR001 和新旧两条政策利率。"""
+    d, _ = _liq()
+    x = d.loc["2025-05-08":end].dropna(subset=["DR001s"])
+    s = x["DR001s"]
+    return C.daily_lines(list(x.index), [("每天", s.tolist(), C.NEG, 1.0), ("20 日均值", s.rolling(20).mean().tolist(), C.INK, 2.2)],
+                         title="DR001 和新旧两条政策利率", ylo=1.15, yhi=1.70, yticks=[1.2, 1.3, 1.4, 1.5, 1.6, 1.7], unit="%",
+                         refs=((1.40, "7 天逆回购 1.40%"), (1.25, "隔夜逆回购 1.25%")), month_step=3, height=260,
+                         vlines=((pd.Timestamp("2026-06-29"), "开始做隔夜"),),
+                         desc="2025 年 5 月 8 日以来每天的 DR001 和 20 个交易日均值，以及 7 天逆回购利率 1.40%、2026 年 11 月 2 日起的隔夜逆回购利率 1.25%。"
+                              "2026 年 7 月 23 日以前用银银间回购定盘利率 FDR001 代替。")
+
+
+def fig_rpt1_curve() -> str:
+    c = pd.read_csv(R / "report1_curve.csv", encoding="utf-8-sig")
+    tenors = [0.25, 0.5, 1, 3, 5, 7, 10, 30]
+    return C.tenor_lines(tenors, [("意外", c["意外系数"].tolist(), C.SURPRISE, 2.5), ("预期之内", c["预期之内系数"].tolist(), C.STEEL, 2.0)],
+                         title="调息事件：每 1bp 带动各期限国债多少基点", unit="", nd=2, ylabel="基点", zero_label="没有反应",
+                         desc="40 次调利率事件，各期限中债国债在公告窗口内的变化同时对意外和预期之内回归。意外的系数 3 个月 0.38、5 年 0.65、10 年 0.62、30 年 0.43；预期之内在各期限都接近 0。")
+
+
+def fig_rpt1_funding() -> str:
+    c = pd.read_csv(R / "report1_curve.csv", encoding="utf-8-sig").set_index("期限")
+    f = pd.read_csv(R / "report1_funding.csv", encoding="utf-8-sig")
+    pick = lambda sample, name, win: f[(f["样本"] == sample) & (f["资金利率"] == name) & (f["窗口"] == win)].iloc[0]
+    rows = [("10 年国债（公告窗口）", c.loc["10年"]), ("FR007（前后 20 日）", pick("2015 年后", "FR007", "20 日均值")),
+            ("FDR007（前后 20 日）", pick("2015 年后", "FDR007", "20 日均值")), ("FDR007（前后 5 日）", pick("2015 年后", "FDR007", "5 日均值"))]
+    star = lambda t: "*" if abs(t) >= 1.96 else ""
+    return C.hbar_panels([r[0] for r in rows],
+                         [("意外", [float(r[1]["意外系数"]) for r in rows], [star(r[1]["意外t"]) for r in rows]),
+                          ("预期之内", [float(r[1]["预期之内系数"]) for r in rows], [star(r[1]["预期之内t"]) for r in rows])],
+                         title="每 1bp 带动多少基点：国债和资金利率", nd=2, dim_unmarked=True, tick_labels=False,
+                         desc="10 年国债只对意外反应；2015 年以后，资金利率在前后 20 日的窗口里对意外和预期之内都有反应，前后 5 日看不出来。星号表示 t 的绝对值不小于 1.96。")
 
 
 def hero_fragment() -> str:
@@ -376,7 +413,10 @@ if __name__ == "__main__":
                      ("lpr", fig_lpr), ("curve-events", fig_curve_events), ("cgb-curve", fig_cgb_curve), ("identify", fig_identify),
                      ("cut-vs-rrr", fig_cut_vs_rrr), ("curve-pair", fig_curve_pair), ("gdp-curve", fig_gdp_curve), ("carry", fig_carry),
                      ("mini-lpr", mini_lpr), ("mini-brier", mini_brier), ("mini-vol", mini_vol),
-                     ("liq-rates", fig_liq_rates), ("liq-spread", fig_liq_spread), ("liq-omo", fig_liq_omo)]:
+                     ("liq-rates", fig_liq_rates), ("liq-spread", fig_liq_spread), ("liq-omo", fig_liq_omo),
+                     ("liq-rates-1030", lambda: fig_liq_rates(LIQ_WEEK2, ((1.40, "7 天逆回购 1.40%"), (1.25, "隔夜逆回购 1.25%")), "上周")),
+                     ("liq-omo-1030", lambda: fig_liq_omo(LIQ_WEEK2, "2026-08-24", "（上周）")), ("liq-anchor", fig_liq_anchor),
+                     ("rpt1-curve", fig_rpt1_curve), ("rpt1-funding", fig_rpt1_funding)]:
         save(name, fn())
     (OUT / "hero.html").write_text(hero_fragment(), encoding="utf-8")
     print("写了 hero")

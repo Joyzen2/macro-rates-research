@@ -23,6 +23,8 @@ DAY = pd.Timestamp("2026-10-23")
     ("中国央行今日开展0亿元7天期逆回购操作，今日净回笼5985亿元。", {"d7": 0, "day_net": -5985}),
     ("中国央行今日开展3255亿元7天逆回购操作，操作利率为1.40%。今日有3985亿元逆回购到期，4000亿元MLF到期。",
      {"d7": 3255, "rate7": 1.4, "maturity": 3985}),                    # MLF 到期不算进逆回购
+    ("中国央行公开市场今日开展5410亿元人民币隔夜逆回购操作，利率1.25%。中国央行公开市场今日净回笼5150亿元人民币。",
+     {"on": 5410, "rate_on": 1.25, "day_net": -5150}),                 # 11-02 起隔夜利率公布
 ])
 def test_parse_flash_handles_the_wordings_seen(text, expected):
     p = L.parse_flash(text, DAY)
@@ -79,6 +81,8 @@ def test_week_net_reconciles_with_reported():
 def test_dr_csv_and_policy_rate_steps():
     dr = L.parse_dr_csv("2026-10-23,,,,,,1.2737,1.3214,1.343\n2026-10-22,,,,,,1.2619,1.3179,1.3654\n")
     assert dr.loc["2026-10-23", "DR001"] == 1.2737 and dr.index.is_monotonic_increasing
+    on = L.rate_on_on(pd.DatetimeIndex(["2026-10-30", "2026-11-02", "2026-11-03"]))
+    assert pd.isna(on.iloc[0]) and on.iloc[1:].tolist() == [1.25, 1.25]
     r = L.rate7_on(pd.DatetimeIndex(["2024-07-19", "2024-07-22", "2025-05-07", "2025-05-08"]))
     assert r.tolist() == [1.80, 1.70, 1.50, 1.40]
     csv = pd.read_csv(L.RAW.parents[0] / "policy_rate_changes.csv")

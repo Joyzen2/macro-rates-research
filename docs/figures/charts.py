@@ -313,14 +313,16 @@ def dot_plot(rows: list[tuple[str, float, bool]], *, title: str, ref: tuple[floa
 
 
 def hbar_panels(labels: list[str], panels: list[tuple[str, list[float], list[str]]], *, title: str, unit: str = "", nd: int = 1,
-                desc: str = "", highlight_rows: set[int] | None = None) -> str:
-    """几个横向条形图并排，共用左边的标签；panels：（小标题，数值，每个数值后面的标注）。"""
+                desc: str = "", highlight_rows: set[int] | None = None, signed: bool = True, dim_unmarked: bool = False, tick_labels: bool = True) -> str:
+    """几个横向条形图并排，共用左边的标签；panels：（小标题，数值，每个数值后面的标注）。
+    signed=False 时数值不带正负号、后面带单位（比如通过率）；默认带正负号、不带单位（比如变化量）。"""
+    fmt = lambda v: num(v, nd, True, "") if signed else num(v, nd, False, unit)  # noqa: E731
     label_w = max(text_width(l, LABEL) for l in labels) + 14
     gap, top, row_h = 14, 30, 28
     pw = (W - label_w - gap * (len(panels) - 1)) / len(panels)
     allv = [v for _, vals, _ in panels for v in vals]
     vmin, vmax = min(0.0, *allv), max(0.0, *allv)
-    labs = [(v, num(v, nd, True, "") + m) for _, vals, marks in panels for v, m in zip(vals, marks)]
+    labs = [(v, fmt(v) + m) for _, vals, marks in panels for v, m in zip(vals, marks)]
     left_m = max([text_width(t, TICK) + 6 for v, t in labs if v < 0] or [0])
     right_m = max([text_width(t, TICK) + 6 for v, t in labs if v >= 0] or [0])
     kk = (pw - left_m - right_m) / ((vmax - vmin) or 1.0)
@@ -336,12 +338,15 @@ def hbar_panels(labels: list[str], panels: list[tuple[str, list[float], list[str
         for t in nice_ticks(vmin, vmax, 4):
             if lo <= t <= hi:
                 svg.line(x(t), top, x(t), bottom, "base" if abs(t) < 1e-12 else "grid")
-                svg.text(x(t), bottom + 12, tick_label(t), size=TICK, cls="t3", anchor="middle")
+                if tick_labels:
+                    svg.text(x(t), bottom + 12, tick_label(t), size=TICK, cls="t3", anchor="middle")
         for i, (v, m) in enumerate(zip(vals, marks)):
             yc = top + row_h * i + row_h / 2
             color = INK if (highlight_rows is None or i in highlight_rows) else DIM
+            if dim_unmarked and not m:                       # 显著的画实色，不显著的画淡色
+                color = DIM
             svg.add(f'<path d="{hbar_path(x(0), x(v), yc - 7, 14)}" fill="{color}"><title>{esc(labels[i])} · {esc(ptitle)}：{num(v, nd, True, unit)}</title></path>')
-            lab = num(v, nd, True, "") + m
+            lab = fmt(v) + m
             if v >= 0:
                 svg.text(x(v) + 4, yc, lab, size=TICK, cls="t2")
             else:
@@ -381,7 +386,7 @@ def mini_hbar(rows: list[dict], *, title: str, unit: str = "", nd: int = 1, sign
 
 
 def tenor_lines(tenors: list[float], series: list[tuple[str, list[float], str, float]], *, title: str, unit: str = "bp", desc: str = "",
-                height: float = 250, ylabel: str = "", zero_label: str = "") -> str:
+                height: float = 250, ylabel: str = "", zero_label: str = "", nd: int = 1) -> str:
     """横轴是期限（按平方根排布），每条线是各期限的变化；series：（名字，数值，颜色，线宽）。零线就是「没有变化」。"""
     left, right, top, bottom = 40, W - 64, 48, height - 30
     X = lambda t: left + (math.sqrt(t) - math.sqrt(tenors[0])) / (math.sqrt(tenors[-1]) - math.sqrt(tenors[0])) * (right - left)
@@ -407,10 +412,10 @@ def tenor_lines(tenors: list[float], series: list[tuple[str, list[float], str, f
         path = "M" + "L".join(f"{X(t):.1f},{Y(v):.1f}" for t, v in zip(tenors, vals))
         svg.add(f'<path d="{path}" fill="none" stroke="{color}" stroke-width="{width_}" stroke-linejoin="round" stroke-linecap="round"/>')
         for t, v in zip(tenors, vals):
-            svg.add(f'<circle cx="{X(t):.1f}" cy="{Y(v):.1f}" r="3.5" fill="{color}" stroke="{SURFACE}" stroke-width="1.5"><title>{esc(name)} {names.get(t, t)}：{num(v, 1, True, unit)}</title></circle>')
+            svg.add(f'<circle cx="{X(t):.1f}" cy="{Y(v):.1f}" r="3.5" fill="{color}" stroke="{SURFACE}" stroke-width="1.5"><title>{esc(name)} {names.get(t, t)}：{num(v, nd, True, unit)}</title></circle>')
         t_end, v_end = tenors[-1], vals[-1]
         if not (zero_label and abs(Y(v_end) - Y(0)) < 14):
-            svg.text(X(t_end) + 8, Y(v_end), num(v_end, 1, True, ""), size=TICK, cls="t2")
+            svg.text(X(t_end) + 8, Y(v_end), num(v_end, nd, True, ""), size=TICK, cls="t2")
     if ylabel:
         svg.text(left - 6, top - 10, ylabel, size=TICK, cls="t3", anchor="end", baseline="auto")
     return svg.render()
