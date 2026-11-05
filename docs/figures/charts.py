@@ -31,7 +31,7 @@ def num(v: float, nd: int = 1, signed: bool = False, unit: str = "") -> str:
 
 
 def text_width(s: str, size: float) -> float:
-    return sum(size if ord(c) > 0x2E80 else size * 0.6 for c in str(s))
+    return sum(size if ord(c) > 0x2E80 or c in "–—" else size * 0.6 for c in str(s))     # 中文字体里的连接号也占满一个字宽
 
 
 def nice_ticks(lo: float, hi: float, n: int = 5) -> list[float]:
@@ -451,7 +451,7 @@ def daily_lines(dates: list, series: list[tuple[str, list[float], str, float]], 
     refs：（数值，说明），比如政策利率，画成虚的细线、说明标在右边；vlines：（日期，说明），竖的参考线；
     band：（起，止，说明），浅底色标出一段，比如本周。"""
     tails = [f"{n} {num(v[-1], nd)}{unit}" if end_values else n for n, v, _, _ in series] + [lab for _, lab in refs]
-    left, top, bottom = 36, 22 if (vlines or band) else 10, height - 26
+    left, top, bottom = 36, 22 if (vlines or band or ylabel) else 10, height - 26      # ylabel 画在图的上方，要留出位置
     right = W - max(text_width(t, VALUE) for t in tails) - 26           # 右边留给线尾的色标和标签
     t0, t1 = dates[0].toordinal(), dates[-1].toordinal()
     X, Y = _scale(t0, t1, left, right), _scale(ylo, yhi, bottom, top)

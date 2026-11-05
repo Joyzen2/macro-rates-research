@@ -1,13 +1,11 @@
-"""第 19–22 步（研究报告）用的公开数据，取到 data/raw/reports/。运行：uv run python -m macrob.reports_data
+"""第 19–22 步（研究报告）用的公开数据，取到 data/raw/reports/，再整理成 data/reports/。运行：uv run python -m macrob.reports_data
 
 新浪的单合约日线大约从 2019 年起才有；不存在的合约会报错，跳过。请求之间停 1 秒。
 """
 from __future__ import annotations
 
-import datetime as dt
-import json
+import shutil
 import time
-import urllib.request
 
 import pandas as pd
 
@@ -90,24 +88,27 @@ def others() -> None:
     print("中美收益率、中间价、标普、黄金、商品已存")
 
 
-def fomc() -> None:
-    """华尔街见闻财经日历里的美联储利率决议，按月查。只留决议本身，不留讲话。"""
-    rows = []
-    for m in pd.period_range("2010-01", "2026-12", freq="M"):
-        a, b = m.to_timestamp(), (m + 1).to_timestamp()
-        url = f"https://api-one-wscn.awtmt.com/apiv1/finance/macrodatas?start={int(a.timestamp())}&end={int(b.timestamp())}"
-        items = _retry(lambda: json.loads(urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=25).read())["data"]["items"])
-        for it in items:
-            t = it.get("title", "")
-            if it.get("country") == "美国" and any(k in t for k in ("利率决策", "利率决议", "利率上限", "利率下限", "宣布利率决定")) and "票委" not in t and "讲话" not in t:
-                rows.append({"time": dt.datetime.fromtimestamp(it["public_date"]).strftime("%Y-%m-%d %H:%M"), "title": t, "actual": it.get("actual"), "previous": it.get("previous"), "forecast": it.get("forecast")})
-        time.sleep(1.0)
-    pd.DataFrame(rows).drop_duplicates().to_csv(OUT / "fomc_calendar_raw.csv", index=False)
-    print("FOMC 日历", len(rows), "条")
+def snapshot(out=None) -> None:
+    """把取好的数据整理成四篇报告（rpt_*）读的 data/reports/。FOMC 日期（fomc_dates.csv）不在这里生成：财经日历解析出过 7 处错误，
+    现在是对过美联储官网的固定文件，新的决议手工加一行。policy_events 去掉用利率互换算出来的列。"""
+    out = out or RAW.parent / "reports"
+    out.mkdir(parents=True, exist_ok=True)
+    for name in ("futures_contracts", "index_price", "index_total_return", "hs300_pe", "cn_us_yields", "usdcny_parity", "sp500", "gold_etf_518880", "commodity_h11061"):
+        shutil.copy2(OUT / f"{name}.csv", out / f"{name}.csv")
+    shutil.copy2(RAW / "cbond_treasury_wealth_7-10Y.csv", out / "cbond_treasury_wealth_7-10Y.csv")
+    c = pd.concat([pd.read_csv(RAW / f"chinabond_curve_{y}.csv") for y in range(2015, pd.Timestamp.today().year + 1)])
+    c = c[c["曲线名称"] == "中债国债收益率曲线"].drop(columns="曲线名称").rename(columns={"日期": "date"})
+    c.drop_duplicates("date").sort_values("date").to_csv(out / "chinabond_treasury.csv", index=False)
+    results = RAW.parent.parent / "results"
+    f = pd.read_csv(results / "liquidity_daily.csv")
+    f[["date", "DR001s", "DR007s", "FR001", "FR007", "SHIBOR_ON", "SHIBOR_1W", "SHIBOR_3M", "GC001", "rate7", "rate_on"]].to_csv(out / "funding_daily.csv", index=False)
+    e = pd.read_csv(results / "policy_irs_events.csv", encoding="utf-8-sig")
+    e[["date", "工具", "size", "direction", "分组"]].to_csv(out / "policy_events.csv", index=False)
+    print(f"整理好 {len(list(out.glob('*.csv')))} 个文件 → {out}")
 
 
 if __name__ == "__main__":
-    for fn in (indexes, others, fomc, contracts):
+    for fn in (indexes, others, contracts, snapshot):
         try:
             fn()
         except Exception as e:

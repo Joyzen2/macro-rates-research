@@ -9,6 +9,7 @@ NEEDS_DATA = {
     "test_pmi_lag_uses_actual_release_dates",
     "test_nowcast_vintage_only_contains_published_data",
     "test_investing_forecasts_only_change_releases_from_2024",
+    "test_carry_does_not_roll_back_into_an_expiring_contract",
 }
 
 

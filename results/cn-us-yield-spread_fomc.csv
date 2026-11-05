@@ -1,0 +1,2 @@
+n_all,n_fomc,b_normal,t_b_normal,fomc_dummy,t_dummy,interaction,t_interaction,b_fomc,b_fomc_subsample,t_fomc_subsample,sd_us_fomc,sd_us_other,mean_abs_cn_fomc,mean_abs_cn_other
+4204,127,0.044069,5.58345,-0.137386,-0.526055,0.0784431,1.37089,0.122512,0.122512,2.16419,6.28513,5.27985,1.89008,1.6494
